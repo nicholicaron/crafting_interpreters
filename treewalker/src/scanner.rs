@@ -2,43 +2,101 @@
 // of chunks called tokens ("words", and "punctuation" that make up the language's grammar)
 
 use std::fs;
-use std::io;
-
+use std::io::*;
 // When do we return io::Error??
 // REPL
-pub fn run_file(path: String) -> Result<(), io::Error> {
-    let file = fs::read_to_string(path).expect("Failed to read file.");
+pub fn run_file(path: String) -> Result<()> {
+    if let Ok(file) = fs::read_to_string(path) {
+        scan(file);
+    } else {
+        let file_io_error = Error::from(ErrorKind::NotFound);
+        return Err(file_io_error);
+    }
+    Ok(())
     // read file as bytes??
-
-    Ok(run(file))
 }
 
-pub fn run_prompt() -> Result<(), io::Error> {
-    let mut null_input_inc: u8 = 0;
-    let mut input = String::new();
+pub fn run_prompt() -> Result<()> {
     println!("Please enter the file to be compiled: ");
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to get user input.\n");
 
-    loop {
-        if !input.trim().is_empty() {
-            return Ok(run(input.clone()));
-        } else if null_input_inc >= 5 {
-            let error = io::Error::new(io::ErrorKind::Other, "Failed to receive input >5 times");
-            return Err(error);
-        } else {
-            null_input_inc += 1;
-            println!("Failed to get input, let's try again:\n");
+    match stdin().lines().next().unwrap() {
+        Ok(path) => {
+            run_file(path).unwrap();
+            Ok(())
         }
+        Err(name_parsing_error) => Err(name_parsing_error),
     }
 }
 
-// When do we return io::Error??
-// Should arg be Byte String, Byte Array, or normal string??
-fn run(source: String) {
-    // source file as byte vector
-    let source_str = fs::read_to_string(source).expect("Failed to read file");
-    // maybe consider rayon::par_iter somewhere? Depending on file size. Could be future optimization
-    let source_bv = source_str.as_bytes();
+// TO DO:
+// Do we tokenize or discard spaces/newlines?
+// Associate line numbers and column numbers with tokens
+fn scan(source: String) -> Vec<Token> {
+    let mut tokens: Vec<Token> = Vec::new();
+    let mut char_indices = source.char_indices().peekable();
+
+    // let's use CharIndices to keep track of state when we need to check if a token is single or multi-character
+    // CharIndices provides peekable method to let us conditionally advance the current index if we have a multi-character token
+    // Using while let here instead of for in to avoid moving the iterator produced by char_indices
+    while let Some((index, character)) = char_indices.next() {
+        let token = match character {
+            // match a single token
+            '+' => Token::Plus,
+            '=' => match char_indices.next_if_eq(&(index + 1, '=')) {
+                Some(_) => Token::EqualEqual,
+                None => Token::Equal,
+            },
+            '!' => match char_indices.next_if_eq(&(index + 1, '=')) {
+                Some(_) => Token::NotEqual,
+                None => Token::Invalid("!".to_string()),
+            },
+            // Checking for strings
+
+            // take_while method conditionally consumes and returns elements of an iterator as long as its predicate function evaluates to true
+            // when the predicate function evals to false, the iterator terminates
+            // take_while takes possession of the original iterator, so we will instead borrow it mutable via by_ref()
+            // elements consumed by take_while are also removed from original iterator so we don't have to worry about double counting
+            '"' => {
+                let mut last_char_matched: char = '\0';
+
+                let s: String = char_indices
+                    .by_ref()
+                    .take_while(|(_index, character)| {
+                        last_char_matched = *character;
+                        *character != '"'
+                    })
+                    // call to map ditches the index value, keeping the character so we can append it to s
+                    .map(|(_index, character)| character)
+                    .collect();
+
+                match last_char_matched {
+                    '"' => Token::StringLiteral(s),
+                    _ => Token::Invalid("Unterminated literal".to_string()),
+                }
+            }
+            n if char::is_numeric(n) => {
+                let s: String = char_indices
+                    .by_ref()
+                    .take_while(|(_index, character)| char::is_numeric(*character))
+                    .map(|(_index, character)| character)
+                    .collect();
+
+                let number: u32 = s.parse::<u32>().unwrap();
+                Token::Number(number)
+            }
+            _ => Token::Invalid(format!("{}", character)),
+        };
+        tokens.push(token);
+    }
+    tokens
+}
+
+enum Token {
+    Plus,
+    Equal,
+    EqualEqual,
+    NotEqual,
+    Number(u32),
+    StringLiteral(String),
+    Invalid(String),
 }

@@ -23,8 +23,8 @@ fn main() {
 
     if let Some(f) = matches.get_one::<String>("filename") {
         // Impl error handling here if file is unavailable
-        let scan = scanner::run_file(f.clone());
+        let _scan = scanner::run_file(f.clone());
     } else {
-        let scan = scanner::run_prompt();
+        let _scan = scanner::run_prompt();
     }
 }
