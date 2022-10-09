@@ -41,5 +41,4 @@ fn run(source: String) {
     let source_str = fs::read_to_string(source).expect("Failed to read file");
     // maybe consider rayon::par_iter somewhere? Depending on file size. Could be future optimization
     let source_bv = source_str.as_bytes();
-    // https://petermalmgren.com/token-scanning-with-rust/
 }
