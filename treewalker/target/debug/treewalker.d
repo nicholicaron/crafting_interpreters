@@ -1,0 +1,1 @@
+/home/c/dev/rust/crafting_interpreters/treewalker/target/debug/treewalker: /home/c/dev/rust/crafting_interpreters/treewalker/src/main.rs /home/c/dev/rust/crafting_interpreters/treewalker/src/scanner.rs
